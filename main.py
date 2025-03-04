@@ -25,11 +25,34 @@ def main(page: ft.Page):
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     
+    # 테스트용 자동 로그인 기능
+    def auto_login_for_testing():
+        # 테스트용 사용자 데이터
+        user_data = {
+            "user_id": "test123",
+            "name": "테스트 사용자",
+            "email": "test@example.com",
+            "picture": None,
+            "subscription_type": "Free"
+        }
+        
+        # 직접 메인 화면으로 전환
+        page.clean()
+        page.add(create_youtube_analyzer_view(user_data))
+        page.update()
+    
+    # 테스트/디버그 모드 - 자동 로그인을 원하면 아래 주석을 해제
+    page.add(ft.ElevatedButton("테스트 모드: 자동 로그인", on_click=lambda _: auto_login_for_testing()))
+    
+
+
     # Google OAuth 제공자 설정
     provider = GoogleOAuthProvider(
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        redirect_url="https://auth4flet.fly.dev/oauth_callback", 
+        redirect_url="http://localhost:8000/api/oauth/redirect", 
+        # redirect_url="https://auth4flet.fly.dev/oauth_callback", 
+        
     )
     
     # 로그인 화면 컴포넌트
@@ -38,7 +61,7 @@ def main(page: ft.Page):
             [
                 ft.Container(
                     content=ft.Image(
-                        src="https://raw.githubusercontent.com/flet-dev/examples/main/python/apps/youtube-dl/app/video-player.png",
+                        src="assets/video-player.png",
                         width=200,
                         height=200,
                         fit=ft.ImageFit.CONTAIN,
@@ -49,12 +72,12 @@ def main(page: ft.Page):
                     "유튜브 중독자",
                     size=32,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.RED_600,
+                    color=ft.colors.RED_600,
                 ),
                 ft.Text(
                     "YouTube 영상 분석 및 지식화 도구",
                     size=16,
-                    color=ft.Colors.GREY_700,
+                    color=ft.colors.GREY_700,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 ft.Container(
@@ -62,7 +85,7 @@ def main(page: ft.Page):
                         content=ft.Row(
                             [
                                 ft.Image(
-                                    src="https://raw.githubusercontent.com/flet-dev/examples/main/python/apps/counter-with-firebase/firebase-auth/app/assets/google.png",
+                                    src="assets/google.png",
                                     width=24,
                                     height=24,
                                 ),
@@ -84,7 +107,7 @@ def main(page: ft.Page):
                     content=ft.Text(
                         "로그인하면 모든 기능을 사용할 수 있습니다",
                         size=12,
-                        color=ft.Colors.GREY_500,
+                        color=ft.colors.GREY_500,
                     ),
                     margin=ft.margin.only(top=10),
                 ),
@@ -101,15 +124,15 @@ def main(page: ft.Page):
             content=ft.Row(
                 [
                     ft.Icon(
-                        ft.Icons.PLAY_CIRCLE_FILL_ROUNDED,
-                        color=ft.Colors.RED_600,
+                        ft.icons.PLAY_CIRCLE_FILL_ROUNDED,
+                        color=ft.colors.RED_600,
                         size=30,
                     ),
                     ft.Text(
                         "유튜브 중독자",
                         size=24,
                         weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.RED_600,
+                        color=ft.colors.RED_600,
                     ),
                     ft.Container(expand=True),
                     ft.Container(
@@ -125,7 +148,7 @@ def main(page: ft.Page):
                                         ft.Text(
                                             f"구독: {user_data.get('subscription_type', 'Free')}",
                                             size=12,
-                                            color=ft.Colors.GREY_700,
+                                            color=ft.colors.GREY_700,
                                         ),
                                     ],
                                     spacing=2,
@@ -137,7 +160,7 @@ def main(page: ft.Page):
                                     radius=20,
                                 ),
                                 ft.IconButton(
-                                    icon=ft.Icons.LOGOUT,
+                                    icon=ft.icons.LOGOUT,
                                     tooltip="로그아웃",
                                     on_click=handle_logout,
                                 ),
@@ -157,12 +180,12 @@ def main(page: ft.Page):
             gradient=ft.LinearGradient(
                 begin=ft.alignment.top_center,
                 end=ft.alignment.bottom_center,
-                Colors=[ft.Colors.GREY_50, ft.Colors.WHITE],
+                colors=[ft.colors.GREY_50, ft.colors.WHITE],
             ),
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=15,
-                color=ft.Colors.with_opacity(0.2, ft.Colors.GREY_300),
+                color=ft.colors.with_opacity(0.2, ft.colors.GREY_300),
                 offset=ft.Offset(0, 5),
             ),
         )
@@ -171,7 +194,7 @@ def main(page: ft.Page):
         url_field = ft.TextField(
             label="YouTube URL",
             hint_text="유튜브 주소를 복사해 넣으세요",
-            prefix_icon=ft.Icons.LINK,
+            prefix_icon=ft.icons.LINK,
             border_radius=10,
             expand=True,
             on_focus=lambda e: paste_from_clipboard(e, url_field),
@@ -181,7 +204,7 @@ def main(page: ft.Page):
         question_field = ft.TextField(
             label="궁금한 내용을 질문하세요",
             hint_text="영상 내용에 대한 질문",
-            prefix_icon=ft.Icons.QUESTION_ANSWER,
+            prefix_icon=ft.icons.QUESTION_ANSWER,
             border_radius=10,
             expand=True,
         )
@@ -198,7 +221,7 @@ def main(page: ft.Page):
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=10,
-                color=ft.Colors.with_opacity(0.2, ft.Colors.GREY_300),
+                color=ft.colors.with_opacity(0.2, ft.colors.GREY_300),
                 offset=ft.Offset(0, 2),
             ),
             border_radius=ft.border_radius.all(10),
@@ -206,10 +229,10 @@ def main(page: ft.Page):
         )
         
         # 진행 표시줄
-        progress_bar = ft.ProgressBar(width=320, visible=False, color=ft.Colors.RED_500)
+        progress_bar = ft.ProgressBar(width=320, visible=False, color=ft.colors.RED_500)
         
         # 답변 텍스트 영역
-        answer_text = ft.Text("영상에서 추출한 내용이 여기에 표시됩니다", selectable=True)
+        answer_text = ft.Text("영상에서 추출한 내용이 여기에 표시됩니다", selectable=True,expand=True)
         
         scrollable_answer = ft.Container(
             content=ft.Column(
@@ -217,10 +240,11 @@ def main(page: ft.Page):
                 scroll=ft.ScrollMode.ALWAYS,
                 spacing=10,
                 height=300,
+                expand=True,
             ),
-            border=ft.border.all(1, ft.Colors.GREY_300),
+            border=ft.border.all(1, ft.colors.RED_300),
             border_radius=10,
-            padding=20,
+            padding=10,
             expand=True,
             margin=ft.margin.only(top=15),
         )
@@ -230,29 +254,29 @@ def main(page: ft.Page):
             [
                 ft.ElevatedButton(
                     "썸네일 못참아!",
-                    icon=ft.Icons.IMAGE,
+                    icon=ft.icons.IMAGE,
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.INDIGO_500,
+                        color=ft.colors.WHITE,
+                        bgcolor=ft.colors.INDIGO_500,
                     ),
                 ),
                 ft.ElevatedButton(
                     "요약 아니고 정리",
-                    icon=ft.Icons.SUMMARIZE,
+                    icon=ft.icons.SUMMARIZE,
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.TEAL_500,
+                        color=ft.colors.WHITE,
+                        bgcolor=ft.colors.TEAL_500,
                     ),
                 ),
                 ft.ElevatedButton(
                     "지식백과[옵시디언 연동]",
-                    icon=ft.Icons.BOOK,
+                    icon=ft.icons.BOOK,
                     style=ft.ButtonStyle(
                         shape=ft.RoundedRectangleBorder(radius=10),
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.DEEP_PURPLE_500,
+                        color=ft.colors.WHITE,
+                        bgcolor=ft.colors.DEEP_PURPLE_500,
                     ),
                 ),
             ],
@@ -270,19 +294,12 @@ def main(page: ft.Page):
                             ft.Container(
                                 content=ft.Column(
                                     [
-                                        ft.Row([
-                                            ft.Column([  # Column 위젯으로 묶기
-                                                url_field,
-                                                question_field
-                                            ]),
-                                            thumbnail_display]
-                                        ), 
-                                        # url_field,
-                                        # question_field,
-                                        # ft.Row(
-                                        #     [thumbnail_display],
-                                        #     alignment=ft.MainAxisAlignment.CENTER,
-                                        # ),
+                                        url_field,
+                                        question_field,
+                                        ft.Row(
+                                            [thumbnail_display],
+                                            alignment=ft.MainAxisAlignment.CENTER,
+                                        ),
                                         progress_bar,
                                         action_buttons,
                                         scrollable_answer,
@@ -291,11 +308,11 @@ def main(page: ft.Page):
                                 ),
                                 padding=ft.padding.all(20),
                                 border_radius=10,
-                                bgcolor=ft.Colors.WHITE,
+                                bgcolor=ft.colors.WHITE,
                                 shadow=ft.BoxShadow(
                                     spread_radius=1,
                                     blur_radius=15,
-                                    color=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
+                                    color=ft.colors.with_opacity(0.1, ft.colors.BLACK),
                                     offset=ft.Offset(0, 5),
                                 ),
                             ),
@@ -400,4 +417,4 @@ def main(page: ft.Page):
 
 # 앱 실행
 port = int(os.getenv("PORT", "8000"))
-ft.app(main, port=port, view=ft.WEB_BROWSER)
+ft.app(main, port=port, view=ft.WEB_BROWSER,assets_dir="assets")
