@@ -1,13 +1,17 @@
 import os
 import io
 import re  # 추가: 정규 표현식 모듈
-import logging
 import flet as ft
-import requests
+
 from flet.auth.providers import GoogleOAuthProvider
-import google.generativeai as genai
+from youtube_transcript_api import YouTubeTranscriptApi
 from supabase import create_client, Client
+import google.generativeai as genai
+
 from PIL import Image
+import requests
+
+
 # Google OAuth 환경 변수
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 assert GOOGLE_CLIENT_ID, "set GOOGLE_CLIENT_ID environment variable"
@@ -20,103 +24,117 @@ assert SUPABASE_URL, "set SUPABASE_URL environment variable"
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 assert SUPABASE_KEY, "set SUPABASE_KEY environment variable"
 
-GEMINI_API_KEY= os.getenv("GEMINI_API_KEY")
-assert GEMINI_API_KEY, "set GEMINI_API_KEY environment variable"
 # Supabase 클라이언트 초기화
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-# #Gemini Pro Vision 모델 선택
-# generation_config = {
-#     "temperature": 1,
-#     "top_p": 0.95,
-#     "top_k": 40,
-#     "max_output_tokens": 8192,
-#     "response_mime_type": "text/plain",
-# }
-# model = genai.GenerativeModel(
-#     model_name="gemini-2.0-flash-exp",
-#     # model_name="gemini-2.0-flash-thinking-exp-01-21",
-#     generation_config=generation_config,
-# )
-# Gemini API 연결 확인 함수 (수정 없음)
-def check_gemini_api_connectivity():
-    """Gemini API 연결을 확인합니다."""
-    try:
-        # 환경 변수에서 API 키 가져오기
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            logging.error("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
-            return False
 
-        # Gemini API 클라이언트 구성
-        genai.configure(api_key=api_key)
 
-        # gemini-2.0-flash-exp 모델 사용 (가장 기본적인 모델)
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
-        # 간단한 텍스트 생성 요청 보내기
-        response = model.generate_content("Hello, Gemini!")
 
-        # 응답 확인
-        if response and response.text:
-            logging.info("Gemini API 연결 성공!")
-            logging.info(f"응답: {response.text}")
-            return True
-        else:
-            logging.error("Gemini API 연결 실패: 응답이 없습니다.")
-            return False
+# Gemini Pro Vision 모델 선택
+generation_config = {
+    "temperature": 1,
+    "top_p": 0.95,
+    "top_k": 40,
+    "max_output_tokens": 8192,
+    "response_mime_type": "text/plain",
+}
 
-    except Exception as e:
-        logging.error(f"Gemini API 연결 실패: {e}")
-        return False
+model = genai.GenerativeModel(
+    model_name="gemini-2.0-flash-exp",
+    # model_name="gemini-2.0-flash-thinking-exp-01-21",
+    generation_config=generation_config,
+)
+
 def extract_korean_text_from_image_url(image_url):
-        """
-        이미지 URL에서 한국어 문장을 추출합니다.
+    """
+    이미지 URL에서 한국어 문장을 추출합니다.
 
-        Args:
-            image_url: 이미지 URL
+    Args:
+        image_url: 이미지 URL
 
-        Returns:
-            추출된 한국어 문장 (문장이 없으면 빈 문자열)
-        """
-        try:
-            # 이미지 다운로드
-            response = requests.get(image_url, stream=True)
-            response.raise_for_status()  # 오류 발생 시 예외 발생
+    Returns:
+        추출된 한국어 문장 (문장이 없으면 빈 문자열)
+    """
+    try:
+        # 이미지 다운로드
+        response = requests.get(image_url, stream=True)
+        response.raise_for_status()  # 오류 발생 시 예외 발생
 
-            # # 이미지 로드
-            image = Image.open(io.BytesIO(response.content))
-            
+        # 이미지 로드
+        image = Image.open(io.BytesIO(response.content))
 
-            # Gemini Pro Vision 모델에 이미지와 프롬프트 전달
-            prompt_parts = [
-                "이 이미지에서 한국어 문장을 추출해줘. 만약 한국어 문장이 없다면 아무것도 출력하지 마.",
-                image
-            ]
-            # response = model.generate_content(prompt_parts, stream=False)  # 추가
+        # Gemini Pro Vision 모델에 이미지와 프롬프트 전달
+        prompt_parts = [
+            "이 이미지에서 한국어 문장을 추출해줘. 만약 한국어 문장이 없다면 아무것도 출력하지 마.",
+            image
+        ]
+        response = model.generate_content(prompt_parts, stream=False)  # 추가
 
-            # # 결과 추출 및 반환
-            # text = response.text
-            return ""#text.strip()
+        # 결과 추출 및 반환
+        text = response.text
+        return text.strip()
 
-        except requests.exceptions.RequestException as e:
-            print(f"이미지 다운로드 오류: {e}")
-            return ""
-        except Exception as e:
-            print(f"오류 발생: {e}")
-            return ""
+    except requests.exceptions.RequestException as e:
+        print(f"이미지 다운로드 오류: {e}")
+        return ""
+    except Exception as e:
+        print(f"오류 발생: {e}")
+        return ""
 
+    except requests.exceptions.RequestException as e:
+        print(f"이미지 다운로드 오류: {e}")
+        return "", None
+    except Exception as e:
+        print(f"오류 발생: {e}")
+        return "", None
     
-def main(page: ft.Page):
+def generate_question(extracted_text, transcript, question=None):
+    """
+    추출된 문장에서 질문을 만들고, transcript에서 답을 찾아 Concise하게 답변합니다.
+    markdown 형식 으로 답변을 반환합니다.
+    Args:
+      extracted_text: 추출된 문장
+      transcript: 답변을 찾을 transcript 내용
+      question: 수정된 질문 (선택적)
 
+    Returns:
+      생성된 질문, 답, 또는 None (질문 생성 실패 시)
+    """
+    try:
+        if question:  # 수정된 질문이 있으면 그대로 사용
+            question_text = question
+        else:
+            # 질문 생성 프롬프트
+            question_prompt = f"""
+            주어진 문장: "{extracted_text}"
+
+            위 문장에서 사람들이 가장 궁금해할 만한 핵심 질문을 하나 만들어줘.
+            질문은 한국어로 작성하고, 간결하게 만들어줘.
+            """
+            
+            question_response = model.generate_content(
+                question_prompt, stream=False)  # 추가
+
+            question_text = question_response.text.strip()
+
+        return question_text
+    except Exception as e:
+        print(f"오류 발생: {e}")
+        return None
+
+
+def main(page: ft.Page):
     # 페이지 속성 설정
     page.title = "유튜브 중독자 로그인"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    
 
     extracted_text_data = ""
     transcript_data = ""
 
+    # 썸네일 표시 영역
     thumbnail_display = ft.Container(
         content=ft.Image(
             src="https://picsum.photos/200/200?5",
@@ -135,20 +153,113 @@ def main(page: ft.Page):
         margin=ft.margin.only(top=10, bottom=10),
     )
 
+    # # 테스트용 자동 로그인 기능
+    # def auto_login_for_testing():
+    #     # 테스트용 사용자 데이터
+    #     user_data = {
+    #         "user_id": "test123",
+    #         "name": "테스트 사용자",
+    #         "email": "test@example.com",
+    #         "picture": None,
+    #         "subscription_type": "Free"
+    #     }
+        
+    #     # 직접 메인 화면으로 전환
+    #     page.clean()
+    #     page.add(create_youtube_analyzer_view(user_data))
+    #     page.update()
+    
+    # 테스트/디버그 모드 - 자동 로그인을 원하면 아래 주석을 해제
+    #page.add(ft.ElevatedButton("테스트 모드: 자동 로그인", on_click=lambda _: auto_login_for_testing()))
+    
+
+
     # Google OAuth 제공자 설정
     provider = GoogleOAuthProvider(
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        #redirect_url="http://127.0.0.1:8550/oauth_callback", 
+        #redirect_url="http://localhost:8000/api/oauth/redirect", 
         redirect_url="https://auth4flet.fly.dev/oauth_callback", 
+        
     )
-    
-    # 사용자 정보 표시를 위한 UI 컴포넌트
-    login_button = ft.ElevatedButton("Google로 로그인", on_click=lambda e: page.login(provider))
-    logout_button = ft.ElevatedButton("로그아웃", on_click=lambda e: handle_logout(e))
-    user_info = ft.Column(visible=False)
-    
+    ########### 여기부터 로직 추가###################
+    # def extract_info(e):
+    #     nonlocal url_field, extracted_text_data, transcript_data, thumbnail_display
+    #     progress_bar.visible = True  # Hide progress bar
+    #     url = url_field.value
 
+    #     video_id = url.split('v=')[1]
+    #     question_text = question_field.value 
+    #     if '&' in video_id:
+    #         video_id = video_id.split('&')[0]
+
+    #     try:
+    #         progress_bar.value=0.3
+    #         answer_text.value = "30 : 유튜브 내용을 추출하였습니다. "
+    #         page.update()  # UI 업데이트
+
+    #         markdown_result, answer = generate_answer(
+    #             question_text, transcript_data)
+    #         progress_bar.value=0.5
+    #         answer_text.value = "70: 답변을 생성하였습니다."
+    #         page.update()  # UI 업데이트
+
+    #         # 수정: markdown 결과 받기
+    #         if markdown_result:
+    #             # 추가로 구현해야 함.
+    #             # filename = save_markdown_file(
+    #             #     markdown_result, url, "question_answer")  # 추가: 마크다운 파일 저장
+    #             # progress_bar.value=0.8
+    #             # answer_text.value = "80: 답변을 저장하였습니다."
+    #             # page.update()  # UI 업데이트
+
+    #             answer_text.value = markdown_result  # 수정: 마크다운 결과 출력
+    #             page.overlay.append(
+    #                 ft.SnackBar(
+    #                     ft.Text("답변 완료."), open=True))
+    #         else:
+    #             answer_text.value = "질문/답변 생성 실패"
+
+    #         progress_bar.value=1.0
+    #         answer_text.value = f"{answer}"
+    #         page.update()  # UI 업데이트
+    #     except Exception as e:
+    #         answer_text.value =f"오류: {e}"
+    #         page.update()
+    
+    
+    # def generate_answer(question_text, transcript, question=None):
+    #     """
+    #     transcript에서 답을 찾아 Concise하게 답변합니다.
+    #     markdown 형식 으로 답변을 반환합니다.
+    #     Args:
+    #     extracted_text: 추출된 문장
+    #     transcript: 답변을 찾을 transcript 내용
+    #     question: 수정된 질문 (선택적)
+
+    #     Returns:
+    #     생성된 질문, 답, 또는 None (질문 생성 실패 시)
+    #     """
+    #     try:
+    #         # 답변 찾기 프롬프트
+    #         answer_prompt = f"""
+    #         질문: "{question_text}"
+    #         Transcript: "{transcript}"
+
+    #         위 질문에 대한 답을 Transcript에서 찾아서 한국어로 알려줘.
+    #         답변은 Concise하게 작성하고, 만약 답을 찾을 수 없다면 "답변을 찾을 수 없습니다." 라고 출력해줘.
+    #         """
+    #         answer_response = model.generate_content(
+    #             answer_prompt, stream=False)  # 추가
+    #         answer = answer_response.text.strip()
+
+    #         # Markdown 형식으로 결과 반환
+    #         markdown_result = f"## 질문\n{question_text}\n\n## 답변\n{answer}"
+    #         return markdown_result, answer
+
+    #     except Exception as e:
+    #         print(f"오류 발생: {e}")
+    #         return None, None
     def on_change(e):
         # 정규 표현식을 사용하여 유튜브 URL 패턴 감지
         youtube_regex = (
@@ -182,127 +293,24 @@ def main(page: ft.Page):
         thumbnail_display.content.src = thumbnail_url
         
         thumbnail_display.update()  # 이미지 업데이트
-        # try:
-
-        #     transcript = YouTubeTranscriptApi.get_transcript(
-        #         video_id, languages=['ko', 'en'])
-        #     transcript_data = transcript
-        #     progress_bar.value=0.3
-        #     answer_text.value = "30 : 유튜브 내용을 추출하였습니다. "
-        #     page.update()  # UI 업데이트
-
-        #     question = generate_question(
-        #         extracted_text, transcript)
-        #     progress_bar.value=0.5
-        #     answer_text.value = "50: 질문을 생성하고 답변을 가져옵니다."
-        #     question_field.value = question
-        #     page.update()  # UI 업데이트
-        # except Exception as e:
-        #     question_field.value = f"오류: {e}"   
-
-    
-    # 로그인 처리 함수
-    def on_login(e):
-        if e.error:
-            show_message(f"로그인 오류: {e.error}")
-            return
-        
-        # Google 로그인 성공, Supabase와 연동
         try:
-            # 사용자 정보 가져오기
-            user_id = page.auth.user.id
-            user_email = page.auth.user.get('email', '')
-            user_name = page.auth.user.get('name', '')
-            user_picture = page.auth.user.get('picture', '')
-            
-            user_data = {
-                "user_id": user_id,
-                "email": user_email,
-                "name": user_name,
-                "picture": user_picture,
-                "subscription_type": "Free"  # 기본값
-            }
-            
-            # Supabase에서 사용자 검색 (supabase가 초기화된 경우만)
-            if supabase:
-                try:
-                    result = supabase.table("users").select("*").eq("user_id", user_id).execute()
-                    
-                    if not result.data:
-                        # 신규 사용자 - Supabase에 추가
-                        user_data_for_db = {
-                            "user_id": user_id,
-                            "email": user_email,
-                            "name": user_name,
-                            "picture": user_picture,
-                            "subscription_type": "free",  # 기본값: 무료 사용자
-                            "created_at": "now()"
-                        }
-                        supabase.table("users").insert(user_data_for_db).execute()
-                        show_message(f"환영합니다! {user_name}님의 계정이 생성되었습니다.")
-                    else:
-                        # 기존 사용자
-                        user_data = result.data[0]
-                        show_message(f"{user_name}님, 다시 오신 것을 환영합니다!")
-                except Exception as e:
-                    print(f"Supabase 연동 오류: {e}")
-                    show_message("사용자 데이터 처리 중 오류가 발생했습니다.")
-            
-            # 로그인 후 화면 전환
-            page.clean()
-            page.add(create_youtube_analyzer_view(user_data))
-            
-        except Exception as e:
-            show_message(f"사용자 데이터 처리 중 오류 발생: {str(e)}")
-    
-    # 로그아웃 처리 함수
-    def handle_logout(e):
-        # 로컬 인증 상태 초기화
-        try:
-            page.logout()
-        except Exception as e:
-            show_message(f"사용자 데이터 처리 중 오류 발생: {str(e)}")
 
-            # 로그아웃 UI 업데이트
-        login_button.visible = True
-        logout_button.visible = False
-        user_info.visible = False
-        
-        show_message("로그아웃되었습니다.")
-        page.update()
-    
-    # 사용자 정보 표시 업데이트 함수
-    def update_user_info():
-        if page.auth and page.auth.user:
-            # Supabase에서 사용자 정보 가져오기
-            user_id = page.auth.user.id
-            result = supabase.table("users").select("*").eq("user_id", user_id).execute()
-            
-            if result.data:
-                user_data = result.data[0]
-                
-                # 사용자 정보 표시 업데이트
-                user_info.controls = [
-                    ft.Text(f"이름: {user_data.get('name', '알 수 없음')}", size=18),
-                    ft.Text(f"이메일: {user_data.get('email', '알 수 없음')}"),
-                    ft.Text(f"구독 유형: {user_data.get('subscription_type', 'free')}"),
-                    ft.Container(height=20),
-                    ft.Text("계정 정보", weight=ft.FontWeight.BOLD),
-                    ft.Text(f"계정 생성일: {user_data.get('created_at', '알 수 없음')}")
-                ]
-                
-                # 버튼 표시 상태 업데이트
-                login_button.visible = False
-                logout_button.visible = True
-                user_info.visible = True
-                page.update()
-    
-    # 메시지 표시 헬퍼 함수
-    def show_message(message):
-        page.snack_bar = ft.SnackBar(content=ft.Text(message))
-        page.snack_bar.open = True
-        page.update()
-    
+            transcript = YouTubeTranscriptApi.get_transcript(
+                video_id, languages=['ko', 'en'])
+            transcript_data = transcript
+            progress_bar.value=0.3
+            answer_text.value = "30 : 유튜브 내용을 추출하였습니다. "
+            page.update()  # UI 업데이트
+
+            question = generate_question(
+                extracted_text, transcript)
+            progress_bar.value=0.5
+            answer_text.value = "50: 질문을 생성하고 답변을 가져옵니다."
+            question_field.value = question
+            page.update()  # UI 업데이트
+        except Exception as e:
+            question_field.value = f"오류: {e}"            
+    ##################################################
     # URL 입력 필드
     url_field = ft.TextField(
         label="YouTube URL",
@@ -377,6 +385,9 @@ def main(page: ft.Page):
         spacing=10,
     )
     
+
+    #scrollable_answer = None
+    # 로그인 화면 컴포넌트
     def create_login_view():
         return ft.Column(
             [
@@ -437,6 +448,7 @@ def main(page: ft.Page):
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=10,
         )
+    
     
     # YouTube 분석 화면 컴포넌트
     def create_youtube_analyzer_view(user_data):
@@ -558,26 +570,96 @@ def main(page: ft.Page):
             height=page.height,
         )
 
-    page.on_login = on_login
-    # 모든 컨트롤을 페이지에 추가
-    page.add(create_login_view())
     
-# 앱 실행
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
 
-    # Gemini API 연결 확인
-    if check_gemini_api_connectivity():
-        print("Gemini API 연결 테스트 성공")
-    else:
-        print("Gemini API 연결 테스트 실패")
-    port = int(os.getenv("PORT", "8000"))
-    # ft.app(main, port=8550, view=ft.WEB_BROWSER)
-    ft.app(main, port=port, view=ft.WEB_BROWSER)
 
-# # 테스트 함수 실행
+    # 로그인 처리 함수
+    def on_login(e):
+        if e.error:
+            show_message(f"로그인 오류: {e.error}")
+            return
+        
+        # Google 로그인 성공, Supabase와 연동
+        try:
+            # 사용자 정보 가져오기
+            user_id = page.auth.user.id
+            user_email = page.auth.user.get('email', '')
+            user_name = page.auth.user.get('name', '')
+            user_picture = page.auth.user.get('picture', '')
+            
+            user_data = {
+                "user_id": user_id,
+                "email": user_email,
+                "name": user_name,
+                "picture": user_picture,
+                "subscription_type": "Free"  # 기본값
+            }
+            
+            # Supabase에서 사용자 검색 (supabase가 초기화된 경우만)
+            if supabase:
+                try:
+                    result = supabase.table("users").select("*").eq("user_id", user_id).execute()
+                    
+                    if not result.data:
+                        # 신규 사용자 - Supabase에 추가
+                        user_data_for_db = {
+                            "user_id": user_id,
+                            "email": user_email,
+                            "name": user_name,
+                            "picture": user_picture,
+                            "subscription_type": "free",  # 기본값: 무료 사용자
+                            "created_at": "now()"
+                        }
+                        supabase.table("users").insert(user_data_for_db).execute()
+                        show_message(f"환영합니다! {user_name}님의 계정이 생성되었습니다.")
+                    else:
+                        # 기존 사용자
+                        user_data = result.data[0]
+                        show_message(f"{user_name}님, 다시 오신 것을 환영합니다!")
+                except Exception as e:
+                    print(f"Supabase 연동 오류: {e}")
+                    show_message("사용자 데이터 처리 중 오류가 발생했습니다.")
+            
+            # 로그인 후 화면 전환
+            page.clean()
+            page.add(create_youtube_analyzer_view(user_data))
+            
+        except Exception as e:
+            show_message(f"사용자 데이터 처리 중 오류 발생: {str(e)}")
+    
+    # 로그아웃 처리 함수
+    def handle_logout(e):
+        # 로컬 인증 상태 초기화
+        try:
+            page.logout()
+            # 로그아웃 후 로그인 화면으로 전환
+            page.clean()
+            page.add(create_login_view())
+            show_message("로그아웃되었습니다.")
+        except Exception as e:
+            show_message(f"로그아웃 중 오류 발생: {str(e)}")
+    
+    # 메시지 표시 헬퍼 함수
+    def show_message(message):
+        page.snack_bar = ft.SnackBar(
+            content=ft.Text(message),
+            action="확인",
+        )
+        page.snack_bar.open = True
+        page.update()
+    
+    # 페이지 이벤트 핸들러 설정
+    page.on_login = on_login
+    
+    # 초기 화면 설정 (로그인 화면)
+    page.add(create_login_view())
+
+
+
+
 # if __name__ == "__main__":
-#     if test_gemini_api_connection():
-#         print("Gemini API 연결 및 모델 호출 테스트 성공")
-#     else:
-#         print("Gemini API 연결 및 모델 호출 테스트 실패")  
+#     port = int(os.getenv("PORT", "8000"))
+#     ft.app(main, port=port, view=ft.WEB_BROWSER,assets_dir="assets")
+# 앱 실행
+port = int(os.getenv("PORT", "8000"))
+ft.app(main, port=port, view=ft.WEB_BROWSER)
